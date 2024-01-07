@@ -867,7 +867,13 @@ public class CSONSerializerTest {
        @CSONValue
        private CSONObject csonObject = new CSONObject();
 
-       @CSONValue("ok[3]")
+       @CSONValue("csonObject")
+       private CSONObject csonObject1 = new CSONObject();
+
+       @CSONValue("ok[2]")
+       private CSONObject csonObject3 = new CSONObject();
+
+       @CSONValue("ok[2]")
        private CSONObject csonObject2 = new CSONObject();
     }
 
@@ -875,7 +881,9 @@ public class CSONSerializerTest {
     public void csonElementInClassTest() {
         CSONElementInClass csonElementInClass = new CSONElementInClass();
         csonElementInClass.csonObject.put("name", "name");
+        csonElementInClass.csonObject1.put("name1", "name1");
         csonElementInClass.csonObject2.put("name2", "name2");
+        csonElementInClass.csonObject3.put("name3", "name3");
         CSONObject csonObject = CSONSerializer.toCSONObject(csonElementInClass);
         System.out.println(csonObject.toString(JSONOptions.json5()));
 
