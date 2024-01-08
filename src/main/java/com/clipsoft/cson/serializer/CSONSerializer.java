@@ -4,6 +4,7 @@ import com.clipsoft.cson.*;
 import com.clipsoft.cson.util.DataConverter;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class CSONSerializer {
 
@@ -171,22 +172,9 @@ public class CSONSerializer {
         return root;
     }
 
+
     private static void putValueInCSONElement(CSONElement csonElement, ISchemaValue ISchemaValueAbs, Object key, Object value) {
         if(key instanceof String) {
-            if(value instanceof CSONObject) {
-                CSONObject alreadyValue = ((CSONObject) csonElement).optCSONObject((String)(key));
-                if(alreadyValue != null) {
-                    ((CSONObject) value).merge(alreadyValue);
-                }
-            }
-            else if(value instanceof CSONArray) {
-                CSONArray alreadyValue = ((CSONObject) csonElement).optCSONArray((String)(key));
-                if(alreadyValue != null) {
-                    ((CSONArray) value).merge(alreadyValue);
-                }
-            }
-
-
             ((CSONObject) csonElement).put((String) key, value);
             ((CSONObject) csonElement).setCommentForKey((String) key, ISchemaValueAbs.getComment());
             ((CSONObject) csonElement).setCommentAfterKey((String) key, ISchemaValueAbs.getAfterComment());
@@ -195,19 +183,6 @@ public class CSONSerializer {
             if(!(csonElement instanceof CSONArray)) {
                 throw new CSONSerializerException("Invalide path. '" + key + "' is not array index." +  "(csonElement is not CSONArray. csonElement=" + csonElement +  ")");
             }
-            if(value instanceof  CSONObject) {
-                CSONObject alreadyValue = ((CSONArray) csonElement).optCSONObject((int)key);
-                if(alreadyValue != null) {
-                    ((CSONObject) value).merge(alreadyValue);
-                }
-            }
-            else if(value instanceof CSONArray) {
-                CSONArray alreadyValue = ((CSONArray) csonElement).optCSONArray((int)key);
-                if(alreadyValue != null) {
-                    ((CSONArray) value).merge(alreadyValue);
-                }
-            }
-
 
             ((CSONArray)csonElement).set((int)key, value);
             ((CSONArray)csonElement).setCommentForValue((int)key, ISchemaValueAbs.getComment()) ;
@@ -471,6 +446,18 @@ public class CSONSerializer {
                     finalTarget.put(key, null);
                 }
             });
+        } else if(types == Types.CSONObject) {
+            csonObject.keySet().forEach(key -> {
+                CSONObject child = csonObject.optCSONObject(key, null);
+                if(child != null) finalTarget.put(key, child);
+                else finalTarget.put(key, null);
+            });
+        } else if(types == Types.CSONArray) {
+            csonObject.keySet().forEach(key -> {
+                CSONArray child = csonObject.optCSONArray(key, null);
+                if(child != null) finalTarget.put(key, child);
+                else finalTarget.put(key, null);
+            });
         }
 
         return target;
@@ -658,6 +645,12 @@ public class CSONSerializer {
             } else if(isArrayType ? ((CSONArray) cson).isNull((int)key) : ((CSONObject)cson).isNull((String)key)) {
                 schemaField.setValue(parents, null);
             }
+        } else if(Types.CSONObject == valueType) {
+            CSONObject value = isArrayType ? ((CSONArray) cson).optCSONObject((int)key) : ((CSONObject)cson).optCSONObject((String)key);
+            schemaField.setValue(parents, value);
+        } else if(Types.CSONArray == valueType) {
+            CSONArray value = isArrayType ? ((CSONArray) cson).optCSONArray((int)key) : ((CSONObject)cson).optCSONArray((String)key);
+            schemaField.setValue(parents, value);
         }
         else {
             try {
@@ -691,6 +684,10 @@ public class CSONSerializer {
                 return csonArray.optChar(index, '\0');
             case String:
                 return csonArray.optString(index);
+            case CSONArray:
+                return csonArray.optCSONArray(index);
+            case CSONObject:
+                return csonArray.optCSONObject(index);
             case Object:
                 CSONObject csonObject = csonArray.optCSONObject(index);
                 if(csonObject != null) {
