@@ -14,7 +14,7 @@ public abstract class SchemaField extends SchemaValueAbs {
 
 
     SchemaField(TypeElement parentsTypeElement, Field field, String path) {
-        super(parentsTypeElement, path, field.getType());
+        super(parentsTypeElement, path, field.getType(), field.getGenericType());
         this.field = field;
         this.fieldName = field.getName();
         field.setAccessible(true);
@@ -26,7 +26,7 @@ public abstract class SchemaField extends SchemaValueAbs {
         this.comment = comment.isEmpty() ? null : comment;
         this.afterComment = afterComment.isEmpty() ? null : afterComment;
 
-        ISchemaValue.assertValueType(field.getType(), field.getDeclaringClass().getName() + "." + field.getName() );
+        ISchemaValue.assertValueType(field.getType(), this.getType(), field.getDeclaringClass().getName() + "." + field.getName() );
     }
 
 
