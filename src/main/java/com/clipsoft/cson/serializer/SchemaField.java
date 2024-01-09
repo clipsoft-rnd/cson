@@ -2,13 +2,16 @@ package com.clipsoft.cson.serializer;
 
 import java.lang.reflect.Field;
 
-public abstract class SchemaField extends SchemaValueAbs {
+public abstract class SchemaField extends SchemaValueAbs implements ObtainTypeValueInvokerGetter {
 
     final Field field;
     final String fieldName;
 
     final String comment;
     final String afterComment;
+
+
+    final TypeElement.ObtainTypeValueInvoker obtainTypeValueInvoker;
 
     //private final boolean isMapField;
 
@@ -18,6 +21,8 @@ public abstract class SchemaField extends SchemaValueAbs {
         this.field = field;
         this.fieldName = field.getName();
         field.setAccessible(true);
+
+        obtainTypeValueInvoker = parentsTypeElement.findObtainTypeValueInvoker(fieldName);
 
 
         CSONValue csonValue = field.getAnnotation(CSONValue.class);
@@ -30,6 +35,10 @@ public abstract class SchemaField extends SchemaValueAbs {
     }
 
 
+    @Override
+    public TypeElement.ObtainTypeValueInvoker getObtainTypeValueInvoker() {
+        return obtainTypeValueInvoker;
+    }
 
 
 

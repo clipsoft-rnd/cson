@@ -36,6 +36,7 @@ class SchemaMethodForArrayType extends SchemaMethod implements ISchemaArrayValue
     private final List<CollectionItems> collectionBundles;
     protected final Types endpointValueType;
     private final TypeElement objectValueTypeElement;
+    private final TypeElement.ObtainTypeValueInvoker obtainTypeValueInvoker;
 
     SchemaMethodForArrayType(TypeElement parentsTypeElement, Method method) {
         super(parentsTypeElement, method);
@@ -49,6 +50,8 @@ class SchemaMethodForArrayType extends SchemaMethod implements ISchemaArrayValue
         else {
             methodPath += "(" + method.getParameterTypes()[0].getName() + ") <return: " + method.getReturnType().getName() + ">";
         }
+
+        obtainTypeValueInvoker = parentsTypeElement.findObtainTypeValueInvoker(method.getName());
 
         this.collectionBundles = ISchemaArrayValue.getGenericType(genericFieldType, methodPath);
         Class<?> valueClass = this.collectionBundles.get(collectionBundles.size() - 1).valueClass;
@@ -78,6 +81,10 @@ class SchemaMethodForArrayType extends SchemaMethod implements ISchemaArrayValue
         return collectionBundles;
     }
 
+    @Override
+    public TypeElement.ObtainTypeValueInvoker getObtainTypeValueInvoker() {
+        return obtainTypeValueInvoker;
+    }
 
 
     @Override

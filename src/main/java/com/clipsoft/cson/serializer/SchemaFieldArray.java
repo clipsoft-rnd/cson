@@ -12,12 +12,14 @@ class SchemaFieldArray extends SchemaField implements ISchemaArrayValue {
     private final List<CollectionItems> collectionBundles;
     protected final Types ValueType;
     private final TypeElement objectValueTypeElement;
-
+    private final TypeElement.ObtainTypeValueInvoker obtainTypeValueInvoker;
 
     protected SchemaFieldArray(TypeElement typeElement, Field field, String path) {
         super(typeElement, field, path);
         String fieldPath = field.getDeclaringClass().getName() + "." + field.getName() + "<type: " + field.getType().getName() + ">";
         this.collectionBundles = ISchemaArrayValue.getGenericType(field.getGenericType(), fieldPath);
+
+        obtainTypeValueInvoker = typeElement.findObtainTypeValueInvoker(field.getName());
 
         CollectionItems collectionItems = this.collectionBundles.get(collectionBundles.size() - 1);
         Class<?> valueClass = collectionItems.valueClass;
@@ -51,6 +53,11 @@ class SchemaFieldArray extends SchemaField implements ISchemaArrayValue {
         return collectionBundles;
     }
 
+    @Override
+    public TypeElement.ObtainTypeValueInvoker getObtainTypeValueInvoker() {
+        return obtainTypeValueInvoker;
+    }
+
 
     @Override
     public Types getEndpointValueType() {
@@ -82,4 +89,9 @@ class SchemaFieldArray extends SchemaField implements ISchemaArrayValue {
         return super.equalsValueType(schemaValueAbs);
     }
 
+
+    @Override
+    public String targetPath() {
+        return field.getDeclaringClass().getName() + "." + field.getName();
+    }
 }

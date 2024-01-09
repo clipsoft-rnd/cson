@@ -4,10 +4,11 @@ package com.clipsoft.cson.serializer;
 import java.lang.reflect.Method;
 
 
-class SchemaMethod extends SchemaValueAbs {
+class SchemaMethod extends SchemaValueAbs implements ObtainTypeValueInvokerGetter {
 
 
 
+    private final TypeElement.ObtainTypeValueInvoker obtainTypeValueInvoker;
 
     private static Class<?> getValueType(Method method) {
         CSONValueGetter csonValueGetter = method.getAnnotation(CSONValueGetter.class);
@@ -97,6 +98,17 @@ class SchemaMethod extends SchemaValueAbs {
         }
     }
 
+    @Override
+    public TypeElement.ObtainTypeValueInvoker getObtainTypeValueInvoker() {
+        return obtainTypeValueInvoker;
+    }
+
+    @Override
+    public String targetPath() {
+        Method method = methodGetter != null ? methodGetter : methodSetter;
+       return method.getDeclaringClass().getName() + "." + method.getName() + "()";
+    }
+
     static enum MethodType {
         Getter,
         Setter,
@@ -105,6 +117,8 @@ class SchemaMethod extends SchemaValueAbs {
     }
 
     private final String methodPath;
+
+
 
     private static MethodType getMethodType(Method method) {
         CSONValueGetter csonValueGetter = method.getAnnotation(CSONValueGetter.class);
@@ -141,10 +155,12 @@ class SchemaMethod extends SchemaValueAbs {
         if(isGetter) {
             methodPath += "() <return: " + method.getReturnType().getName() + ">";
             ignoreError = method.getAnnotation(CSONValueGetter.class).ignoreError();
+            obtainTypeValueInvoker = null;
         }
         else {
             methodPath += "(" + method.getParameterTypes()[0].getName() + ") <return: " + method.getReturnType().getName() + ">";
             ignoreError = method.getAnnotation(CSONValueSetter.class).ignoreError();
+            obtainTypeValueInvoker = parentsTypeElement.findObtainTypeValueInvoker(method.getName());
         }
         this.methodPath = methodPath;
 

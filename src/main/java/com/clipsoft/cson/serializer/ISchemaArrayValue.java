@@ -17,7 +17,6 @@ interface ISchemaArrayValue extends ISchemaValue {
 
      List<CollectionItems> getCollectionItems();
 
-
      default boolean isGenericTypeValue() {
          int size = getCollectionItems().size();
          CollectionItems collectionItems = getCollectionItems().get(size - 1);
@@ -83,7 +82,10 @@ interface ISchemaArrayValue extends ISchemaValue {
             return getGenericType(collectionBundles,parameterizedType, path);
         }
         else if(fieldArgTypes[0] instanceof TypeVariable) {
-            collectionBundles.add(new CollectionItems(collectionBundles.get(collectionBundles.size() - 1).collectionType, (TypeVariable) fieldArgTypes[0]));
+            CollectionItems collectionItems = collectionBundles.get(collectionBundles.size() - 1);
+            collectionItems.isGeneric = true;
+            collectionItems.genericTypeName = ((TypeVariable) fieldArgTypes[0]).getName();
+            collectionItems.valueClass = Object.class;
             return collectionBundles;
         }
         else {

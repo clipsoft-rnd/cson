@@ -30,6 +30,10 @@ enum Types {
         return type == Byte || type == Short || type == Integer || type == Long || type == Float || type == Double || type == Boolean || type == Character || type == String || type == ByteArray || type == BigDecimal;
     }
 
+    static boolean isCsonType(Types type) {
+        return type == CSONElement || type == CSONObject || type == CSONArray;
+    }
+
 
 
 

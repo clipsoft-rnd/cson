@@ -43,15 +43,6 @@ class CollectionItems {
     }
 
 
-    CollectionItems(Class<?> collectionType, TypeVariable genericType) {
-        this.collectionType = collectionType;
-        //noinspection unchecked
-        this.collectionConstructor = (Constructor<? extends Collection<?>>) constructorOfCollection(collectionType);
-        this.valueClass = Object.class;
-        this.isGeneric = true;
-        this.genericTypeName = genericType.getName();
-
-    }
 
 
     protected final Constructor<? extends Collection<?>> collectionConstructor;
