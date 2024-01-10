@@ -8,9 +8,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.lang.reflect.Method;
 
@@ -82,6 +80,8 @@ class TypeElement {
         return type;
     }
 
+
+
     protected synchronized static TypeElement create(Class<?> type) {
         type = findNoAnonymousClass(type);
 
@@ -149,85 +149,16 @@ class TypeElement {
 
 
     private void searchMethodOfAnnotatedWithObtainTypeValue() {
-        searchMethodOfAnnotatedWithObtainTypeValue(this.type);
-        Class<?>[] interfaces = this.type.getInterfaces();
-        if(interfaces != null) {
-            for(Class<?> interfaceClass : interfaces) {
-                searchMethodOfAnnotatedWithObtainTypeValue(interfaceClass);
-            }
+        List<ObtainTypeValueInvoker> obtainTypeValueInvokers = ObtainTypeValueInvoker.searchObtainTypeValueInvoker(this);
+        for(ObtainTypeValueInvoker obtainTypeValueInvoker : obtainTypeValueInvokers) {
+            // 뒤에 있는 것일수록 부모 클래스의 것이므로 덮어쓰지 않는다.
+            fieldValueObtaiorMap.putIfAbsent(obtainTypeValueInvoker.getFieldName(), obtainTypeValueInvoker);
         }
 
     }
 
     @SuppressWarnings("unchecked")
-    private void searchMethodOfAnnotatedWithObtainTypeValue(Class<?> currentType) {
-        // 이미 등록된 메서드를 덮어쓰지 않도록 하기 위해 HashSet을 사용한다.
-        HashSet<String> methodNames = new HashSet<>();
 
-        while(currentType != Object.class && currentType != null) {
-            Method[] methods = currentType.getDeclaredMethods();
-            for(Method method : methods) {
-                ObtainTypeValue obtainTypeValue = method.getAnnotation(ObtainTypeValue.class);
-                if(obtainTypeValue != null) {
-                    String[] fieldNames = null;
-                    String fieldNameValue = obtainTypeValue.value();
-                    if(fieldNameValue != null && !fieldNameValue.isEmpty()) {
-                        fieldNames = new String[]{fieldNameValue};
-                    }
-                    else {
-                        fieldNames = obtainTypeValue.fieldNames();
-                    }
-                    if(fieldNames == null || fieldNames.length == 0) {
-                        fieldNames = new String[]{SchemaMethod.getterNameFilter(method.getName())};
-                    }
-
-                    for(String fieldName : fieldNames) {
-                        fieldName = fieldName.trim();
-
-                        try {
-                            type.getDeclaredField(fieldName);
-                        } catch (NoSuchFieldException e) {
-                            throw new CSONSerializerException("Invalid @ObtainTypeValue method of " + type.getName() + "." + method.getName() + ". Field " + fieldName + " not found in " + type.getName());
-                        }
-                        Class<?> returnType = method.getReturnType();
-                        Type genericReturnType = method.getGenericReturnType();
-                        boolean genericType = false;
-                        if(genericReturnType instanceof TypeVariable && genericTypeNames.contains(((TypeVariable<?>) genericReturnType).getName())) {
-                            genericType = true;
-                        }
-                        if(!Types.isSingleType(Types.of(returnType)) && (returnType == void.class || returnType == Void.class || returnType == null || (!genericType && returnType.getAnnotation(CSON.class) == null))) {
-                            throw new CSONSerializerException("Invalid @ObtainTypeValue method of " + type.getName() + "." + method.getName() + ".  Return type must be a class annotated with @CSON");
-                        }
-                        int parameterCount = method.getParameterCount();
-                        if(parameterCount > 0) {
-                            Class<?> parameterType = method.getParameterTypes()[0];
-                            //if(!CSONElement.class.isAssignableFrom(parameterType) && !CSONObject.class.isAssignableFrom(parameterType) && !CSONArray.class.isAssignableFrom(parameterType)) {
-                            if(!parameterType.isAssignableFrom(CSONObject.class)) {
-                                throw new CSONSerializerException("Invalid @ObtainTypeValue method of " + type.getName() + "." + method.getName() + ". Parameter type only can be CSONObject");
-                            }
-                        }
-                        if(parameterCount > 1) {
-                            Class<?> parameterType = method.getParameterTypes()[1];
-                            if(!parameterType.isAssignableFrom(CSONObject.class)) {
-                                throw new CSONSerializerException("Invalid @ObtainTypeValue method of " + type.getName() + "." + method.getName() + ". Parameter type only can be CSONObject");
-                            }
-                        }
-
-
-                        if(parameterCount > 2) {
-                            throw new CSONSerializerException("Invalid @ObtainTypeValue method of " + type.getName() + "." + method.getName() + ".  Parameter count must be zero or one of CSONElement or CSONObject or CSONArray");
-                        }
-                        boolean ignoreError = obtainTypeValue.ignoreError();
-                        fieldValueObtaiorMap.put(fieldName, new ObtainTypeValueInvoker(method,
-                                returnType,
-                                method.getParameterTypes(),
-                                ignoreError));
-                    }
-                }
-            }
-            currentType= currentType.getSuperclass();
-        }
-    }
 
     Class<?> getType() {
         return type;
@@ -254,6 +185,11 @@ class TypeElement {
         }
         return false;
 
+    }
+
+
+    Set<String> getGenericTypeNames() {
+        return genericTypeNames;
     }
 
     private static boolean isCSONAnnotatedOfInterface(Class<?> type) {
@@ -310,20 +246,142 @@ class TypeElement {
 
     static class ObtainTypeValueInvoker {
 
-        private ObtainTypeValueInvoker(Method method, Class<?> returnType, Class<?>[] parameters, boolean ignoreError) {
+
+        static List<ObtainTypeValueInvoker> searchObtainTypeValueInvoker(TypeElement typeElement) {
+            List<ObtainTypeValueInvoker> result = new ArrayList<>();
+
+                // 이미 등록된 메서드를 덮어쓰지 않도록 하기 위해 HashSet을 사용한다.
+            HashSet<String> methodNames = new HashSet<>();
+            Set<String> genericTypeNames = typeElement.getGenericTypeNames();
+            if(genericTypeNames == null) {
+                genericTypeNames = Collections.emptySet();
+            }
+
+            Class<?> currentType = typeElement.getType();
+            searchObtainTypeValueInvokerInType(genericTypeNames, currentType, result,methodNames);
+            Class<?>[] interfaces = currentType.getInterfaces();
+            if(interfaces != null) {
+                for(Class<?> interfaceClass : interfaces) {
+                    searchObtainTypeValueInvokerInType(genericTypeNames, interfaceClass, result,methodNames);
+                }
+            }
+
+
+            return result;
+
+        }
+
+        static void searchObtainTypeValueInvokerInType(Set<String> genericTypeNames, Class<?> currentType, List<ObtainTypeValueInvoker> result, HashSet<String> methodNames) {
+            while(currentType != Object.class && currentType != null) {
+                Method[] methods = currentType.getDeclaredMethods();
+                for(Method method : methods) {
+                    // 이미 등록된 메서드를 덮어쓰지 않도록 하기 위해 HashSet을 사용한다.
+                    String methodName = makeMethodName(method);
+                    if(methodNames.contains(methodName)) {
+                       continue;
+                    }
+
+                    ObtainTypeValue obtainTypeValue = method.getAnnotation(ObtainTypeValue.class);
+                    if(obtainTypeValue != null) {
+                        String[] fieldNames;
+                        String fieldNameValue = obtainTypeValue.value();
+                        if(fieldNameValue != null && !fieldNameValue.isEmpty()) {
+                            fieldNames = new String[]{fieldNameValue};
+                        }
+                        else {
+                            fieldNames = obtainTypeValue.fieldNames();
+                        }
+                        if(fieldNames == null || fieldNames.length == 0) {
+                            fieldNames = new String[]{SchemaMethod.getterNameFilter(method.getName())};
+                        }
+                        for(String fieldName : fieldNames) {
+                            fieldName = fieldName.trim();
+                            try {
+                                currentType.getDeclaredField(fieldName);
+                            } catch (NoSuchFieldException e) {
+                                throw new CSONSerializerException("Invalid @ObtainTypeValue method of " + currentType.getName() + "." + method.getName() + ". Field '" + fieldName + "' not found in " + currentType.getName());
+                            }
+                            Class<?> returnType = method.getReturnType();
+                            Type genericReturnType = method.getGenericReturnType();
+                            boolean genericType = false;
+                            if(genericReturnType instanceof TypeVariable && genericTypeNames.contains(((TypeVariable<?>) genericReturnType).getName())) {
+                                genericType = true;
+                            }
+                            else if(!Types.isSingleType(Types.of(returnType)) && (returnType == void.class || returnType == Void.class || returnType == null || (!genericType && returnType.getAnnotation(CSON.class) == null))) {
+                                throw new CSONSerializerException("Invalid @ObtainTypeValue method of " + currentType.getName() + "." + method.getName() + ".  Return type must be a class annotated with @CSON");
+                            }
+                            int parameterCount = method.getParameterCount();
+                            Class<?>[] parameterTypes = method.getParameterTypes();
+                            if(parameterCount > 0) {
+                                Class<?> parameterType = parameterTypes[0];
+                                //if(!CSONElement.class.isAssignableFrom(parameterType) && !CSONObject.class.isAssignableFrom(parameterType) && !CSONArray.class.isAssignableFrom(parameterType)) {
+                                if(!parameterType.isAssignableFrom(CSONObject.class)) {
+                                    throw new CSONSerializerException("Invalid @ObtainTypeValue method of " + currentType.getName() + "." + method.getName() + ". Parameter type only can be CSONObject");
+                                }
+                            }
+                            if(parameterCount > 1) {
+                                Class<?> parameterType = parameterTypes[1];
+                                if(!parameterType.isAssignableFrom(CSONObject.class)) {
+                                    throw new CSONSerializerException("Invalid @ObtainTypeValue method of " + currentType.getName() + "." + method.getName() + ". Parameter type only can be CSONObject");
+                                }
+                            }
+                            if(parameterCount > 2) {
+                                throw new CSONSerializerException("Invalid @ObtainTypeValue method of " + currentType.getName() + "." + method.getName() + ".  Parameter count must be zero or one of CSONElement or CSONObject or CSONArray");
+                            }
+                            boolean ignoreError = obtainTypeValue.ignoreError();
+
+                            methodNames.add(methodName);
+                            result.add(new ObtainTypeValueInvoker( method, fieldName,
+                                    returnType,
+                                    method.getParameterTypes(),
+                                    ignoreError));
+
+
+                        }
+                    }
+                }
+
+
+                currentType= currentType.getSuperclass();
+            }
+        }
+
+        private static String makeMethodName(Method method) {
+            StringBuilder methodNameBuilder = new StringBuilder();
+            methodNameBuilder.append(method.getName()).append("(");
+            if(method.getParameterCount() == 0) {
+                return methodNameBuilder.append(")").toString();
+            }
+            for(Class<?> parameterType : method.getParameterTypes()) {
+                methodNameBuilder.append(parameterType.getName()).append(",");
+            }
+            methodNameBuilder.deleteCharAt(methodNameBuilder.length() - 1).append(")");
+            return methodNameBuilder.toString();
+        }
+
+
+        private ObtainTypeValueInvoker(Method method,String fieldName,  Class<?> returnType, Class<?>[] parameters, boolean ignoreError) {
             this.method = method;
             this.returnType = returnType;
             this.parameters = parameters;
             this.ignoreError = ignoreError;
+            this.fieldName = fieldName;
         }
 
         private Method method;
         private Class<?> returnType;
         private Class<?>[] parameters;
         boolean ignoreError = false;
+        private String fieldName;
+
+        String getFieldName() {
+            return fieldName;
+        }
 
 
-        public Object obtain(Object parents,CSONObject item, CSONObject all) {
+
+
+        Object obtain(Object parents,CSONObject item, CSONObject all) {
             try {
                 if(parameters == null || parameters.length == 0) {
                     return method.invoke(parents);
